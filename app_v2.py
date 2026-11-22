@@ -13,51 +13,51 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# =================【🎨 カスタムCSSによるデザイン調整】=================
+# =================【🎨 カスタムCSSによる暖色系デザイン調整】=================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
     html, body, [data-testid="stAppViewContainer"] {
         font-family: 'Noto Sans JP', sans-serif;
-        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+        background: linear-gradient(135deg, #FFF5F5 0%, #FFE3E3 50%, #FFD8A8 100%);
     }
-    
+
     .main-title {
         font-size: 2.5rem;
         font-weight: 700;
-        background: linear-gradient(135deg, #6366F1, #3B82F6, #10B981);
+        background: linear-gradient(135deg, #FF6B6B, #FF8787, #FFA94D);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 8px;
         text-align: center;
     }
     .sub-title {
-        color: #4B5563; 
+        color: #862E2E;
         font-size: 1.05rem;
         text-align: center;
         margin-bottom: 2rem;
     }
-    
+
     .stButton > button {
-        background: linear-gradient(135deg, #6366F1, #3B82F6) !important;
+        background: linear-gradient(135deg, #FF6B6B, #FF922B) !important;
         color: white !important;
         font-weight: bold !important;
         border: none !important;
         padding: 0.8rem 2rem !important;
         border-radius: 12px !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2) !important;
+        box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3) !important;
         transition: all 0.3s ease !important;
         width: 100% !important;
     }
     .stButton > button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3) !important;
-        background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
+        box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4) !important;
+        background: linear-gradient(135deg, #FA5252, #F76707) !important;
     }
-    
+
     section[data-testid="stFileUploader"] {
         background-color: #ffffff;
-        border: 2px dashed #6366F1;
+        border: 2px dashed #FF8787;
         border-radius: 12px;
         padding: 1.5rem;
     }
@@ -88,7 +88,7 @@ if uploaded_files:
         st.error("⚠️ 一度にアップロードできる画像は最大10枚までです。選択し直してください。")
     else:
         st.success(f"📸 {len(uploaded_files)} 枚の画像が正常に読み込まれました。")
-        
+
         # 3列構成で画像プレビューを表示
         cols = st.columns(min(len(uploaded_files), 3))
         for idx, file in enumerate(uploaded_files):
@@ -104,34 +104,34 @@ if uploaded_files:
             else:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                
+
                 all_ocr_texts = []
-                
+
                 try:
                     # 1. 各ページに対してOCR処理
                     for idx, file in enumerate(uploaded_files):
                         status_text.text(f"📖 {idx + 1}/{len(uploaded_files)} 枚目の画像をテキストに変換中...")
-                        
+
                         image = Image.open(file)
                         image = ImageOps.exif_transpose(image).convert("RGB")
-                        
+
                         img = np.array(image)
                         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
                         processed = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-                        
+
                         ocr_text = pytesseract.image_to_string(processed, lang="jpn", config="--psm 6")
                         if ocr_text.strip():
                             all_ocr_texts.append(f"--- [ページ {idx + 1} の内容] ---\n{ocr_text}")
-                        
+
                         progress_bar.progress(int((idx + 1) / len(uploaded_files) * 50))
-                    
+
                     combined_text = "\n\n".join(all_ocr_texts) if all_ocr_texts else "(画像からテキストを読み取れませんでした)"
-                    
+
                     # 2. Geminiによる高度な要約＆クイズ生成プロンプト
                     status_text.text("🤖 クイズとまとめを構成中...（およそ10秒お待ちください）")
                     progress_bar.progress(75)
-                    
+
                     client = genai.Client(api_key=api_key)
                     prompt = f"""
 あなたは非常に優秀な家庭教師、および教材クリエイターです。
@@ -159,19 +159,19 @@ if uploaded_files:
 【対象テキスト】
 {combined_text}
 """
-                    
+
                     response = client.models.generate_content(
                         model='gemini-3.8-flash',
                         contents=prompt,
                     )
-                    
+
                     progress_bar.progress(100)
                     status_text.empty()
-                    
+
                     st.success("🎉 クイズ・まとめ付きレジュメの作成が完了しました！")
                     st.subheader("📚 作成された学習レジュメ")
                     st.markdown(response.text, unsafe_allow_html=True)
-                    
+
                 except Exception as e:
                     status_text.empty()
                     st.error(f"エラーが発生しました: {e}")
