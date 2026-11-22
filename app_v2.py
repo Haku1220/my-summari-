@@ -8,8 +8,8 @@ from pypdf import PdfReader
 
 # ページ全体のレイアウトと基本設定
 st.set_page_config(
-    page_title="AI教材クリエイター | スマートレジュメ作成",
-    page_icon="📖",
+    page_title="Resumake",
+    page_icon="📚",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
