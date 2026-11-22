@@ -74,7 +74,7 @@ st.markdown("""
 # =====================================================================
 
 # タイトルエリアの描画
-st.markdown('<h1 class="main-title">📖  Resumake Creator</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="main-title">📖  Resumake </h1>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">日々の学びをスマートにドキュメント化</p>', unsafe_allow_html=True)
 
 # APIキーの取得
