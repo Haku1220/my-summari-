@@ -1,169 +1,70 @@
-import streamlit as st
-import pytesseract
+import os
 import cv2
 import numpy as np
+import pytesseract
 from PIL import Image, ImageOps
 from google import genai
+from google.colab import userdata
 
-# ページ全体のレイアウトと基本設定
-st.set_page_config(
-    page_title="AI教材クリエイター | 新デザイン検証",
-    page_icon="📖",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+os.environ['TESSDATA_PREFIX'] = '/usr/share/tesseract-ocr/5/tessdata/'
 
-# =================【🎨 カスタムCSSによる極上デザイン調整】=================
-# ここで全体のフォント、カードの枠線、色のグラデーションなどを自由にカスタマイズしてください！
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap');
-    html, body, [data-testid="stAppViewContainer"] {
-        font-family: 'Noto Sans JP', sans-serif;
-        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
-    }
-
-    /* より洗練されたプレミアムヘッダーのデザイン */
-    .main-title {
-        font-size: 2.5rem;
-        font-weight: 700;
-        background: linear-gradient(135deg, #6366F1, #3B82F6, #10B981);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 8px;
-        text-align: center;
-    }
-    .sub-title {
-        color: #4B5563;
-        font-size: 1.05rem;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-
-    /* カードコンテナ（枠線とソフトシャドウ） */
-    .custom-card {
-        background: white;
-        padding: 24px;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-        border: 1px solid rgba(99, 102, 241, 0.1);
-        margin-bottom: 20px;
-    }
-
-    /* カスタムデザインボタン */
-    .stButton > button {
-        background: linear-gradient(135deg, #6366F1, #3B82F6) !important;
-        color: white !important;
-        font-weight: bold !important;
-        border: none !important;
-        padding: 0.8rem 2rem !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2) !important;
-        transition: all 0.3s ease !important;
-        width: 100% !important;
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3) !important;
-        background: linear-gradient(135deg, #4F46E5, #2563EB) !important;
-    }
-
-    /* ファイルアップローダー枠のデザイン */
-    section[data-testid="stFileUploader"] {
-        background-color: #ffffff;
-        border: 2px dashed #6366F1;
-        border-radius: 12px;
-        padding: 1.5rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
-# =====================================================================
-
-# タイトルエリアの描画
-st.markdown('<h1 class="main-title">📖 AI Smart Resume Creator</h1>', unsafe_allow_html=True)
-st.markdown('<p class="sub-title">【デザイン確認用 ver 2.0】より美しいレイアウトと直感的なインタフェースへの挑戦</p>', unsafe_allow_html=True)
-
-# APIキーの取得
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except Exception:
-    api_key = None
-    st.warning("⚠️ 管理者設定: Streamlit Cloudの Secrets に GEMINI_API_KEY を設定してください。")
+    if not os.path.exists(IMAGE_PATH):
+        raise FileNotFoundError(f"指定された画像が見つかりません: {IMAGE_PATH}")
 
-# 複数画像アップローダーの配置
-uploaded_files = st.file_uploader(
-    "検証用の画像ファイルをアップロードしてください（最大10枚）",
-    type=["jpg", "jpeg", "png"],
-    accept_multiple_files=True
-)
+    # 画像の読み込みと前処理
+    image = Image.open(IMAGE_PATH)
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    img = np.array(image)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    processed = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
 
-if uploaded_files:
-    if len(uploaded_files) > 10:
-        st.error("⚠️ 一度にアップロードできる画像は最大10枚までです。選択し直してください。")
-    else:
-        st.success(f"📸 {len(uploaded_files)} 枚の画像が読み込まれました。")
+    # OCR実行
+    print(f"📖 画像から文字を読み取っています...")
+    ocr_text = pytesseract.image_to_string(processed, lang=OCR_LANG, config="--psm 6")
 
-        # プレビューコンテナ
-        cols = st.columns(min(len(uploaded_files), 3))
-        for idx, file in enumerate(uploaded_files):
-            with cols[idx % 3]:
-                img_preview = Image.open(file)
-                img_preview = ImageOps.exif_transpose(img_preview).convert("RGB")
-                st.image(img_preview, caption=f"検証画像 {idx + 1}", use_container_width=True)
+    # Gemini APIの実行
+    print("🤖 Geminiがクイズ・まとめ付きレジュメを作成しています...")
+    api_key = userdata.get('GEMINI_API_KEY')
+    client = genai.Client(api_key=api_key)
 
-        st.write("")
-        if st.button("✨ 統合レジュメの生成（テスト実行）"):
-            if not api_key:
-                st.error("APIキーが設定されていません。Colab環境でテストする場合は、コード内で直接渡すかSecretsを設定してください。")
-            else:
-                progress_bar = st.progress(0)
-                status_text = st.empty()
+    # レジュメ作成に特化した高度なシステムプロンプト (クイズ・ポイントまとめ付き)
+    prompt = f"""
+あなたは非常に優秀な家庭教師、および教材クリエイターです。
+提供されたOCRテキスト（教科書やノートの読み取りデータ）を元に、学生が直感的に理解でき、学習定着度を高められる高品質な「レジュメ（要約学習プリント）」を作成してください。
 
-                all_ocr_texts = []
+【レジュメ作成ルール】
+1. **タイトルと概要**:
+   何について書かれた内容なのか、一目でわかるタイトルと短い導入を書いてください。
 
-                try:
-                    for idx, file in enumerate(uploaded_files):
-                        status_text.text(f"📖 OCR処理中 ({idx + 1}/{len(uploaded_files)} 枚目)...")
+2. **視覚的な整理（表・グラフ）の積極的導入**:
+   - テキスト内に数値の比較、対比、分類、タイムラインなどがある場合は、箇条書きで済ませず、必ずMarkdownの「表（テーブル）」形式に整理してください。
+   - 物事の流れ（フロー）、因果関係、構成要素のつながりなどがある場合は、Markdown内でレンダリング可能な「Mermaid.js (graph TDなど)」のコードブロックを使って図解を作成してください。
 
-                        image = Image.open(file)
-                        image = ImageOps.exif_transpose(image).convert("RGB")
+3. **重要キーワード解説**:
+   理解に不可欠な専門用語や重要語句をピックアップし、初心者向けに優しく解説してください。
 
-                        img = np.array(image)
-                        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-                        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                        processed = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+4. **★最重要ポイントのまとめ（振り返りセクション）**:
+   この講義・ページにおいて「これだけは絶対に暗記・理解して帰るべき」という超重要エッセンスを、3〜5項目の簡潔な箇条書きでまとめてください。
 
-                        ocr_text = pytesseract.image_to_string(processed, lang="jpn", config="--psm 6")
-                        if ocr_text.strip():
-                            all_ocr_texts.append(f"--- [ページ {idx + 1} の内容] ---\n{ocr_text}")
+5. **★理解度チェッククイズ（Comprehension Quiz）**:
+   学習した内容がしっかりと身についているかテストするための「クイズ」を3問程度作成してください。
+   - 記述式、穴埋め式、または3択式のいずれかで作成してください。
+   - クイズセクションのすぐ下、または折りたたみ（HTML <details> タグなど）を使って、わかりやすい「解答」と「ワンポイント解説」を必ずセットで記述してください。
 
-                        progress_bar.progress(int((idx + 1) / len(uploaded_files) * 50))
+【対象テキスト】
+{ocr_text}
+"""
 
-                    combined_text = "\n\n".join(all_ocr_texts) if all_ocr_texts else "(画像からの文字検出なし)"
+    response = client.models.generate_content(
+        model='gemini-3.8-flash',
+        contents=prompt,
+    )
 
-                    status_text.text("🤖 Geminiによる新規デザインレジュメ生成中...")
-                    progress_bar.progress(75)
+    print("\n✨ === [作成されたクイズ付きレジュメ] ===")
+    print(response.text)
+    print("==============================")
 
-                    client = genai.Client(api_key=api_key)
-                    prompt = f"""
-                    提供された複数のOCRテキストを元に、全体の流れが一目で理解できるように構造化した、高品質な「1つの統合レジュメ」を作成してください。
-                    比較事項は必ずMarkdown表形式を使い、プロセスはMermaid形式でフロー図を書いてください。
-                    \n\n
-                    {combined_text}
-                    """
-
-                    response = client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=prompt,
-                    )
-
-                    progress_bar.progress(100)
-                    status_text.empty()
-
-                    st.success("🎉 新デザインでのレジュメ生成が正常に完了しました！")
-                    st.subheader("📚 作成されたレジュメプレビュー")
-                    st.markdown(response.text)
-
-                except Exception as e:
-                    status_text.empty()
-                    st.error(f"エラーが発生しました: {e}")
+except Exception as e:
+    print(f"❌ エラーが発生しました: {e}")
