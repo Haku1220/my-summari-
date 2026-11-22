@@ -1,3 +1,11 @@
+# =================【設定項目】=================
+# 1. 読み込みたい教科書やノートの画像パス
+IMAGE_PATH = "/content/スクリーンショット (93).png"
+
+# 2. 読み取る言語
+OCR_LANG = "jpn"
+# ==============================================
+
 import os
 import cv2
 import numpy as np
@@ -54,7 +62,7 @@ try:
    - クイズセクションのすぐ下、または折りたたみ（HTML <details> タグなど）を使って、わかりやすい「解答」と「ワンポイント解説」を必ずセットで記述してください。
 
 【対象テキスト】
-{ocr_text}
+{{ocr_text}}
 """
 
     response = client.models.generate_content(
